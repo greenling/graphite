@@ -63,17 +63,34 @@ module Graphite
       end
     end
 
-    def metric(name, frequency = 1.minute, options = {})
+    def metric(name, frequency = 5.minutes, options = {})
       @scheduler.every(frequency, :first_in => '1m') do
-        result = yield
+        result = nil
+
+        time = Benchmark.realtime do
+          begin
+            result = yield
+          rescue Exception => e
+            logger.error("Caught exception for metric #{name}: #{e}")
+          end
+        end
+
+        logger.debug("Calculated #{name}. Took #{time}s. Frequency #{frequency}s. SCORE: #{time/frequency}") if time > 5
         log({name => result})
         cleanup
       end
     end
 
-    def metrics(frequency = 1.minute)
+    def metrics(frequency = 5.minutes)
       @scheduler.every(frequency, :first_in => '1m') do
-        results = yield
+        results = {}
+
+        begin
+          results = yield
+        rescue Exception => e
+          logger.error("Caught exception for hash metrics running every #{frequency}: #{e}")
+        end
+
         log(results)
         cleanup
       end
@@ -87,34 +104,34 @@ module Graphite
 
     private
 
-    def log(results)
+    def log(results, time = nil)
       results.keys.each do |k,v|
-        @metrics["#{@prefix}.#{k}"] = results.delete(k)
+        raise "Measurement is not numeric" unless v.respond_to? :to_f
+        @metrics["#{@prefix}.#{k}"] = OpenStruct.new(:value => results.delete(k), :time => time)
       end
     end
 
     def send_counters
       to_send = {}
       @counters.keys.each do |k|
-        to_send[k] = @counters.delete(k)
+        to_send[k] = OpenStruct.new(:value => @counters.delete(k), :time => Time.now)
       end
-      @logger.log(Time.now, to_send) if to_send.size > 0
+      @logger.log(to_send) if to_send.size > 0
     end
 
     def send_metrics
-      @logger.log(Time.now, @metrics) if @metrics.size > 0
+      @logger.log(@metrics) if @metrics.size > 0
       send_counters
     end
 
     def start_logger_timer
-      @scheduler.every("60s", :blocking => true) do
+      @scheduler.every(60.seconds, :blocking => true) do
         send_metrics
       end
     end
 
-    # Blocks get run in a threadpool -- sharing is caring.
     def cleanup
-      ActiveRecord::Base.clear_active_connections! if defined?(ActiveRecord::Base)
+      ActiveRecord::Base.clear_active_connections!
     end
   end
 end
