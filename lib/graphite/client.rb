@@ -30,10 +30,35 @@ module Graphite
     end
 
     def previous_day_metric(name)
-      @scheduler.every("1d", :first_in => '1m') do
+      @daily_metric_offset ||= 0
+      @daily_metric_offset += 1
+      @scheduler.in(@daily_metric_offset * 60) do
+        Rails.logger.info("Running daily #{name}")
         date = Date.today - 1
-        result = yield date
-        log({name + ".daily" => result})
+        result = nil
+
+        begin
+          result = yield date
+        rescue Exception => e
+          logger.error("Caught exception for metric #{name}.daily: #{e}")
+        end
+
+        log({name + ".daily" => result}, date.to_time.to_i)
+        cleanup
+      end
+
+      @scheduler.cron("#{@daily_metric_offset % 60} 1 * * *") do
+        Rails.logger.info("Running daily #{name}")
+        date = Date.today - 1
+        result = nil
+
+        begin
+          result = yield date
+        rescue Exception => e
+          logger.error("Caught exception for metric #{name}.daily: #{e}")
+        end
+
+        log({name + ".daily" => result}, date.to_time.to_i)
         cleanup
       end
     end
