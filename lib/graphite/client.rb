@@ -25,6 +25,10 @@ module Graphite
       end
     end
 
+    def reset_connection!
+      @logger.reset_connection!
+    end
+
     def previous_day_metric(name)
       @scheduler.every("1d", :first_in => '1m') do
         date = Date.today - 1
