@@ -1,4 +1,3 @@
-require 'eventmachine'
 require 'rufus-scheduler'
 
 module Graphite
@@ -12,18 +11,16 @@ module Graphite
     # * logger - a regular logger for writing messages to
     def initialize(server, prefix, options={})
       @logger = options[:graphite_logger] || Graphite::Logger.new(server,options[:logger])
+      @scheduler = options[:scheduler] || Rufus::Scheduler.start_new
       @prefix = prefix
       @metrics = {}
       @counters = {}
 
       if block_given?
-        @scheduler = Rufus::Scheduler::EmScheduler.start_new
         yield self
         start_logger_timer
         @scheduler.join
       else
-        Graphite::EventMachineHandler.ensure_running
-        @scheduler = Rufus::Scheduler::EmScheduler.start_new
         start_logger_timer
       end
     end

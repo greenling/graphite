@@ -9,7 +9,6 @@ begin
     gem.email = "mike@capitalthought.com"
     gem.homepage = "http://github.com/otherinbox/graphite"
     gem.authors = ["Ian Ragsdale", "Mike Subelsky"]
-    gem.add_dependency "eventmachine"
     gem.add_dependency "rufus-scheduler"
 
     # gem is a Gem::Specification... see http://www.rubygems.org/read/chapter/20 for additional settings
