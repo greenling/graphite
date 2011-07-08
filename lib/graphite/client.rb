@@ -1,4 +1,5 @@
 require 'rufus-scheduler'
+require 'ostruct'
 
 module Graphite
   class Client
