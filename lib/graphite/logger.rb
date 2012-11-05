@@ -29,7 +29,7 @@ module Graphite
     def log(time, measurements)
       message = ""
       measurements.each do |key, value|
-        raise "Measurement is not numeric" unless value.respond_to? :to_f
+        next unless value.respond_to? :to_f
         message << "#{key} #{value.to_f} #{time.to_i}\n"
       end
       logger.info("Graphite: #{message}") if logger
