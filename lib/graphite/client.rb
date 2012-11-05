@@ -41,9 +41,12 @@ module Graphite
     def metric(name, frequency = 1.minute, options = {})
       add_shifts(name,options[:shifts]) if options[:shifts]
       @scheduler.every(frequency, :first_in => '1m') do
-        result = yield
-        log({name => result})
-        cleanup
+        begin
+          result = yield
+          log({name => result})
+          cleanup
+        rescue
+        end
       end
     end
 
