@@ -110,7 +110,7 @@ module Graphite
     end
 
     def start_logger_timer
-      @scheduler.every("60s", :blocking => true) do
+      @scheduler.every("58s", :blocking => true) do
         send_metrics
       end
     end
