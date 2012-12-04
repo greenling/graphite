@@ -3,8 +3,8 @@ require 'rufus-scheduler'
 
 module Graphite
   class Client
-    
-    # Expects a string in the form of "hostname:port_num" where port_num is optional, and a prefix 
+
+    # Expects a string in the form of "hostname:port_num" where port_num is optional, and a prefix
     # to identify this server. Example:
     # Graphite::Client.new("graphite.example.com", "yourapp.#{Rails.env}.instances.#{hostname}.#{$$}")
     # valid options are:
@@ -40,13 +40,34 @@ module Graphite
 
     def metric(name, frequency = 1.minute, options = {})
       add_shifts(name,options[:shifts]) if options[:shifts]
-      @scheduler.every(frequency, :first_in => '1m') do
-        begin
-          result = yield
-          log({name => result})
-          cleanup
-        rescue
+      if frequency.is_a?(Fixnum)
+        @scheduler.every(frequency, :first_in => '1m') do
+          begin
+            result = yield
+            log({name => result})
+            cleanup
+          rescue
+          end
         end
+      elsif frequency.is_a?(Hash)
+        raise "bad frequency value, only one kind supported" unless frequency.keys.length == 1
+        how = frequency.keys.first
+        time = frequency[how]
+        case how
+        when :cron
+          @scheduler.cron(time) do
+            begin
+              result = yield
+              log({name => result})
+              cleanup
+            rescue
+            end
+          end
+        else
+          raise "unsupported scheduling type: #{how.inspect}"
+        end
+      else
+        raise "bad frequency value"
       end
     end
 
