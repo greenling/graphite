@@ -4,6 +4,8 @@ require 'rufus-scheduler'
 module Graphite
   class Client
 
+    attr :logger
+
     # Expects a string in the form of "hostname:port_num" where port_num is optional, and a prefix
     # to identify this server. Example:
     # Graphite::Client.new("graphite.example.com", "yourapp.#{Rails.env}.instances.#{hostname}.#{$$}")
@@ -38,10 +40,29 @@ module Graphite
       end
     end
 
-    def metric(name, frequency = 1.minute, options = {})
+    # Schedules a job according to the supplied cron_string.  The block passed in is expected to return
+    # a Hash of {name => value} metric pairs.
+    def schedule_job(cron_string, options={}, &block)
+      @scheduler.cron(cron_string)  do
+        results = yield
+        metrics = {}
+        results.keys.each do |k,v|
+          metrics["#{@prefix}.#{k}"] = results.delete(k)
+        end
+        @logger.log(Time.now, metrics) if metrics.size > 0
+      end
+    end
+
+    def metric(name, scheme = 1.minute, options = {})
       add_shifts(name,options[:shifts]) if options[:shifts]
-      if frequency.is_a?(Fixnum)
-        @scheduler.every(frequency, :first_in => '1m') do
+
+      unless options[:no_immediate]
+        result = yield
+        log({name => result})
+      end
+
+      if scheme.is_a?(Fixnum)
+        @scheduler.every(scheme, :first_in => '1m') do
           begin
             result = yield
             log({name => result})
@@ -49,10 +70,10 @@ module Graphite
           rescue
           end
         end
-      elsif frequency.is_a?(Hash)
-        raise "bad frequency value, only one kind supported" unless frequency.keys.length == 1
-        how = frequency.keys.first
-        time = frequency[how]
+      elsif scheme.is_a?(Hash)
+        raise "bad scheme value, only 'cron' is supported" unless scheme.keys.length == 1
+        how = scheme.keys.first
+        time = scheme[how]
         case how
         when :cron
           @scheduler.cron(time) do
@@ -67,7 +88,7 @@ module Graphite
           raise "unsupported scheduling type: #{how.inspect}"
         end
       else
-        raise "bad frequency value"
+        raise "bad scheme value #{scheme.inspect}"
       end
     end
 
